@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像二值化处理器 | Image Binarization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Grid Background Pattern */
+        .bg-grid {
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none; 
+            background: transparent; 
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -8px; 
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+
+        /* Canvas Container */
+        .canvas-container {
+            background-image: 
+                linear-gradient(45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1e293b 75%), 
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .upload-zone {
+            transition: all 0.3s ease;
+            border: 2px dashed #475569;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #38bdf8;
+            background: rgba(56, 189, 248, 0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center relative">
+
+    <!-- Background Effects -->
+    <div class="absolute inset-0 bg-grid pointer-events-none z-0"></div>
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-[120px]"></div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="w-full max-w-6xl p-4 z-10 flex flex-col gap-6">
+        
+        <!-- Header -->
+        <header class="text-center mb-4">
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2">
+                图像二值化实验室
+            </h1>
+            <p class="text-slate-400 text-sm md:text-base max-w-2xl mx-auto">
+                上传图像，调整阈值，实时生成高对比度黑白图像。支持本地处理，保护隐私。
+            </p>
+        </header>
+
+        <!-- App Interface -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Panel: Controls -->
+            <div class="lg:col-span-3 flex flex-col gap-4">
+                <div class="glass-panel rounded-2xl p-6 shadow-xl h-full flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+                            <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                            参数设置
+                        </h2>
+
+                        <!-- Upload Area -->
+                        <div id="dropZone" class="upload-zone rounded-xl p-6 mb-8 text-center cursor-pointer group relative overflow-hidden">
+                            <input type="file" id="imageInput" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20">
+                            <div class="relative z-10 pointer-events-none">
+                                <div class="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                                    <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                </div>
+                                <p class="text-sm font-medium text-slate-300">点击或拖拽上传图片</p>
+                                <p class="text-xs text-slate-500 mt-1">支持 JPG, PNG, WEBP</p>
+                            </div>
+                        </div>
+
+                        <!-- Threshold Control -->
+                        <div class="mb-6 opacity-50 pointer-events-none transition-opacity duration-300" id="controlsArea">
+                            <label class="block text-sm font-medium text-slate-300 mb-2 flex justify-between">
+                                <span>阈值 (Threshold)</span>
+                                <span id="thresholdValue" class="mono text-cyan-400 font-bold">128</span>
+                            </label>
+                            <input type="range" id="thresholdRange" min="0" max="255" value="128" class="w-full mb-2">
+                            <div class="flex justify-between text-xs text-slate-500 mono">
+                                <span>0 (黑)</span>
+                                <span>255 (白)</span>
+                            </div>
+                            
+                            <div class="mt-4 flex gap-2">
+                                <input type="number" id="thresholdInput" min="0" max="255" value="128" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 transition-colors mono">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex flex-col gap-3 opacity-50 pointer-events-none transition-opacity duration-300" id="actionArea">
+                        <button id="processBtn" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-cyan-500/20 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                            应用二值化
+                        </button>
+                        <button id="downloadBtn" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            下载结果
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Canvas Display -->
+            <div class="lg:col-span-9">
+                <div class="glass-panel rounded-2xl p-1 shadow-2xl h-[600px] relative flex flex-col">
+                    <!-- Tabs -->
+                    <div class="flex border-b border-slate-700/50 bg-slate-900/50 rounded-t-xl">
+                        <button id="tabOriginal" class="flex-1 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors border-b-2 border-transparent hover:bg-white/5">原始图像</button>
+                        <button id="tabResult" class="flex-1 py-3 text-sm font-medium text-cyan-400 border-b-2 border-cyan-400 bg-white/5">处理结果</button>
+                    </div>
+
+                    <!-- Viewport -->
+                    <div class="relative flex-1 bg-[#0b1120] rounded-b-xl overflow-hidden canvas-container flex items-center justify-center group">
+                        
+                        <!-- Empty State -->
+                        <div id="emptyState" class="text-center p-8">
+                            <div class="w-24 h-24 bg-slate-800 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-inner">
+                                <svg class="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                            </div>
+                            <h3 class="text-lg font-medium text-slate-300">等待图像上传</h3>
+                            <p class="text-slate-500 text-sm mt-2">请在左侧上传图片开始处理</p>
+                        </div>
+
+                        <!-- Canvas Elements -->
+                        <canvas id="sourceCanvas" class="hidden max-w-full max-h-full object-contain shadow-2xl"></canvas>
+                        <canvas id="resultCanvas" class="hidden max-w-full max-h-full object-contain shadow-2xl"></canvas>
+                        
+                        <!-- Zoom/Info Overlay -->
+                        <div class="absolute bottom-4 right-4 bg-black/60 backdrop-blur px-3 py-1.5 rounded-lg text-xs text-slate-300 mono opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            <span id="imgDimensions">0 x 0 px</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Histogram Section (Visual Candy) -->
+        <div class="glass-panel rounded-2xl p-6 mt-2 opacity-50 pointer-events-none transition-opacity duration-300" id="histogramArea">
+            <h3 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">灰度直方图 (Grayscale Histogram)</h3>
+            <div class="h-32 w-full flex items-end gap-[1px]" id="histogramBars">
+                <!-- Bars generated by JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+        const sourceCanvas = document.getElementById('sourceCanvas');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const sourceCtx = sourceCanvas.getContext('2d');
+        const resultCtx = resultCanvas.getContext('2d');
+        const thresholdRange = document.getElementById('thresholdRange');
+        const thresholdInput = document.getElementById('thresholdInput');
+        const thresholdValue = document.getElementById('thresholdValue');
+        const processBtn = document.getElementById('processBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const emptyState = document.getElementById('emptyState');
+        const controlsArea = document.getElementById('controlsArea');
+        const actionArea = document.getElementById('actionArea');
+        const histogramArea = document.getElementById('histogramArea');
+        const imgDimensions = document.getElementById('imgDimensions');
+        const tabOriginal = document.getElementById('tabOriginal');
+        const tabResult = document.getElementById('tabResult');
+        const histogramBars = document.getElementById('histogramBars');
+
+        // State
+        let originalImage = null;
+        let currentThreshold = 128;
+        let isProcessing = false;
+
+        // --- Event Listeners ---
+
+        // Drag & Drop Visuals
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        // File Input
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Threshold Controls
+        function updateThreshold(val) {
+            currentThreshold = parseInt(val);
+            thresholdRange.value = currentThreshold;
+            thresholdInput.value = currentThreshold;
+            thresholdValue.textContent = currentThreshold;
+            
+            // Visual update on histogram marker could go here
+            updateHistogramMarker(currentThreshold);
+        }
+
+        thresholdRange.addEventListener('input', (e) => updateThreshold(e.target.value));
+        thresholdInput.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value);
+            if (val > 255) val = 255;
+            if (val < 0) val = 0;
+            updateThreshold(val);
+        });
+
+        // Process Button
+        processBtn.addEventListener('click', () => {
+            if (originalImage) {
+                applyBinarization();
+                switchTab('result');
+            }
+        });
+
+        // Download Button
+        downloadBtn.addEventListener('click', () => {
+            if (!originalImage) return;
+            const link = document.createElement('a');
+            link.download = 'binarized-image.png';
+            link.href = resultCanvas.toDataURL();
+            link.click();
+        });
+
+        // Tabs
+        tabOriginal.addEventListener('click', () => switchTab('original'));
+        tabResult.addEventListener('click', () => switchTab('result'));
+
+        function switchTab(tab) {
+            if (tab === 'original') {
+                sourceCanvas.classList.remove('hidden');
+                resultCanvas.classList.add('hidden');
+                tabOriginal.classList.add('text-cyan-400', 'border-cyan-400', 'bg-white/5');
+                tabOriginal.classList.remove('text-slate-400', 'border-transparent');
+                tabResult.classList.remove('text-cyan-400', 'border-cyan-400', 'bg-white/5');
+                tabResult.classList.add('text-slate-400', 'border-transparent');
+            } else {
+                sourceCanvas.classList.add('hidden');
+                resultCanvas.classList.remove('hidden');
+                tabResult.classList.add('text-cyan-400', 'border-cyan-400', 'bg-white/5');
+                tabResult.classList.remove('text-slate-400', 'border-transparent');
+                tabOriginal.classList.remove('text-cyan-400', 'border-cyan-400', 'bg-white/5');
+                tabOriginal.classList.add('text-slate-400', 'border-transparent');
+            }
+        }
+
+        // --- Core Logic ---
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请上传有效的图片文件');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalImage = new Image();
+                originalImage.onload = () => {
+                    initCanvas();
+                    enableUI();
+                    generateHistogram();
+                    // Auto process on load with default threshold
+                    applyBinarization();
+                    switchTab('result');
+                };
+                originalImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function initCanvas() {
+            // Set canvas dimensions to match image
+            // Limit max display size for performance if image is huge, but keep internal resolution
+            const maxDisplayWidth = 1200;
+            let displayWidth = originalImage.width;
+            let displayHeight = originalImage.height;
+
+            // We keep internal resolution high, CSS handles display scaling
+            sourceCanvas.width = originalImage.width;
+            sourceCanvas.height = originalImage.height;
+            resultCanvas.width = originalImage.width;
+            resultCanvas.height = originalImage.height;
+
+            // Draw original
+            sourceCtx.drawImage(originalImage, 0, 0);
+            
+            // Update info
+            imgDimensions.textContent = `${originalImage.width} x ${originalImage.height} px`;
+            emptyState.classList.add('hidden');
+        }
+
+        function enableUI() {
+            controlsArea.classList.remove('opacity-50', 'pointer-events-none');
+            actionArea.classList.remove('opacity-50', 'pointer-events-none');
+            histogramArea.classList.remove('opacity-50', 'pointer-events-none');
+        }
+
+        function applyBinarization() {
+            if (!originalImage) return;
+
+            const width = sourceCanvas.width;
+            const height = sourceCanvas.height;
+            
+            // Get pixel data
+            const srcData = sourceCtx.getImageData(0, 0, width, height);
+            const dstData = resultCtx.createImageData(width, height);
+            
+            const pixels = srcData.data;
+            const dstPixels = dstData.data;
+            const thresh = currentThreshold;
+
+            // Loop through pixels
+            // Optimization: Use a single loop
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+                
+                // Grayscale conversion (Luminance)
+                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                
+                // Thresholding
+                const val = (gray >= thresh) ? 255 : 0;
+                
+                dstPixels[i] = val;     // R
+                dstPixels[i + 1] = val; // G
+                dstPixels[i + 2] = val; // B
+                dstPixels[i + 3] = 255; // Alpha
+            }
+
+            resultCtx.putImageData(dstData, 0, 0);
+        }
+
+        function generateHistogram() {
+            if (!originalImage) return;
+            
+            const width = sourceCanvas.width;
+            const height = sourceCanvas.height;
+            const srcData = sourceCtx.getImageData(0, 0, width, height);
+            const pixels = srcData.data;
+            
+            const histogram = new Array(256).fill(0);
+            
+            // Calculate grayscale values and populate histogram
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i + 1];
+                const b = pixels[i + 2];
+                const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+                histogram[gray]++;
+            }
+            
+            // Find max for normalization
+            const maxCount = Math.max(...histogram);
+            
+            // Render bars
+            histogramBars.innerHTML = '';
+            histogram.forEach((count, index) => {
+                const bar = document.createElement('div');
+                const heightPercent = (count / maxCount) * 100;
+                
+                // Color based on intensity
+                const intensity = index;
+                const color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                
+                bar.className = 'flex-1 bg-slate-600 hover:bg-cyan-400 transition-colors relative group';
+                bar.style.height = `${Math.max(heightPercent, 1)}%`;
+                bar.style.backgroundColor = color;
+                bar.dataset.index = index; // Store index for marker
+                
+                // Tooltip
+                bar.title = `Value ${index}: ${count} pixels`;
+                
+                histogramBars.appendChild(bar);
+            });
+        }
+
+        function updateHistogramMarker(threshold) {
+            // Simple visual feedback: highlight the specific bar
+            const bars = histogramBars.children;
+            for (let bar of bars) {
+                const index = parseInt(bar.dataset.index);
+                if (index === threshold) {
+                    bar.style.backgroundColor = '#38bdf8'; // Cyan
+                    bar.style.zIndex = '10';
+                } else {
+                    // Reset to grayscale gradient
+                    const intensity = index;
+                    bar.style.backgroundColor = `rgb(${intensity}, ${intensity}, ${intensity})`;
+                    bar.style.zIndex = '1';
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>
