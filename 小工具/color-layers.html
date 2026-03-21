@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>颜色分离工具 - 按颜色提取像素</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b, #feca57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #a0a0a0;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .upload-section {
+            background: rgba(255, 255, 255, 0.03);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            padding: 50px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-section:hover::before {
+            left: 100%;
+        }
+
+        .upload-section:hover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.1);
+        }
+
+        .upload-section.dragover {
+            border-color: #00d4ff;
+            background: rgba(0, 212, 255, 0.1);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.8;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .upload-text {
+            font-size: 1.3rem;
+            color: #ffffff;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .upload-hint {
+            color: #888;
+            font-size: 0.95rem;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:active::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 184, 148, 0.3);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0, 184, 148, 0.4);
+        }
+
+        .progress-container {
+            display: none;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .progress-container.active {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .progress-title {
+            font-size: 1.1rem;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .progress-text {
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #ff6b6b, #feca57);
+            width: 0%;
+            transition: width 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .preview-section {
+            display: none;
+            margin-bottom: 30px;
+        }
+
+        .preview-section.active {
+            display: block;
+        }
+
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .preview-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .preview-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--card-color), transparent);
+            opacity: 0.5;
+        }
+
+        .preview-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .color-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .color-box {
+            width: 35px;
+            height: 35px;
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .color-box::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+        }
+
+        .color-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .color-hex {
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .color-count {
+            font-size: 0.85rem;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .preview-canvas-wrapper {
+            background: 
+                linear-gradient(45deg, #1a1a2e 25%, transparent 25%), 
+                linear-gradient(-45deg, #1a1a2e 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1a1a2e 75%), 
+                linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .preview-canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .download-single {
+            margin-top: 15px;
+            width: 100%;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .download-single:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .original-preview {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .original-preview h3 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .original-canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            background: 
+                linear-gradient(45deg, #1a1a2e 25%, transparent 25%), 
+                linear-gradient(-45deg, #1a1a2e 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #1a1a2e 75%), 
+                linear-gradient(-45deg, transparent 75%, #1a1a2e 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #16213e;
+        }
+
+        .stats-bar {
+            display: none;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        .stats-bar.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .tolerance-control {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tolerance-control label {
+            display: block;
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .tolerance-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .tolerance-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        .tolerance-value {
+            text-align: center;
+            margin-top: 10px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8rem; }
+            .preview-grid { grid-template-columns: 1fr; }
+            .upload-section { padding: 30px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 颜色分离工具</h1>
+        <p class="subtitle">将图片中的每种颜色提取为独立的透明背景PNG文件</p>
+
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">点击或拖拽上传图片</div>
+            <div class="upload-hint">支持 JPG, PNG, WebP, GIF 格式</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <div class="tolerance-control hidden" id="toleranceControl">
+            <label>🎚️ 颜色容差（用于合并相似颜色）</label>
+            <input type="range" class="tolerance-slider" id="toleranceSlider" min="0" max="50" value="0">
+            <div class="tolerance-value">容差: <span id="toleranceValue">0</span> (建议保持0以精确分离每种颜色)</div>
+        </div>
+
+        <div class="original-preview hidden" id="originalPreview">
+            <h3>📷 原始图片预览</h3>
+            <canvas id="originalCanvas" class="original-canvas"></canvas>
+        </div>
+
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-header">
+                <span class="progress-title" id="progressTitle">正在分析颜色...</span>
+                <span class="progress-text" id="progressText">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+
+        <div class="stats-bar" id="statsBar">
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalColors">0</div>
+                    <div class="stat-label">发现颜色数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="totalPixels">0</div>
+                    <div class="stat-label">总像素数</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="processTime">0ms</div>
+                    <div class="stat-label">处理时间</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" id="analyzeBtn" disabled>🔍 分析颜色</button>
+            <button class="btn-success" id="downloadAllBtn" disabled>📦 打包下载全部</button>
+            <button class="btn-secondary" id="resetBtn">🔄 重新上传</button>
+        </div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-grid" id="previewGrid"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        // DOM 元素
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInput = document.getElementById('fileInput');
+        const originalPreview = document.getElementById('originalPreview');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const toleranceControl = document.getElementById('toleranceControl');
+        const toleranceSlider = document.getElementById('toleranceSlider');
+        const toleranceValue = document.getElementById('toleranceValue');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressTitle = document.getElementById('progressTitle');
+        const progressText = document.getElementById('progressText');
+        const progressFill = document.getElementById('progressFill');
+        const statsBar = document.getElementById('statsBar');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const previewSection = document.getElementById('previewSection');
+        const previewGrid = document.getElementById('previewGrid');
+
+        let originalImage = null;
+        let imageData = null;
+        let colorMap = new Map(); // 存储每种颜色的像素位置
+        let colorCanvases = new Map(); // 存储每种颜色生成的canvas
+
+        // 容差控制
+        toleranceSlider.addEventListener('input', (e) => {
+            toleranceValue.textContent = e.target.value;
+        });
+
+        // 上传区域事件
+        uploadSection.addEventListener('click', () => fileInput.click());
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // 处理文件
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('请上传图片文件！');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    displayOriginalImage(img);
+                    analyzeBtn.disabled = false;
+                    uploadSection.classList.add('hidden');
+                    originalPreview.classList.remove('hidden');
+                    toleranceControl.classList.remove('hidden');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 显示原始图片
+        function displayOriginalImage(img) {
+            const ctx = originalCanvas.getContext('2d');
+            // 限制显示尺寸，但保持原始数据
+            const maxDisplayWidth = 800;
+            const scale = Math.min(1, maxDisplayWidth / img.width);
+            
+            originalCanvas.width = img.width;
+            originalCanvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            
+            // 获取完整图像数据
+            imageData = ctx.getImageData(0, 0, img.width, img.height);
+        }
+
+        // 将RGB转换为Hex
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = x.toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        // 颜色匹配（考虑容差）
+        function colorsMatch(r1, g1, b1, r2, g2, b2, tolerance) {
+            return Math.abs(r1 - r2) <= tolerance &&
+                   Math.abs(g1 - g2) <= tolerance &&
+                   Math.abs(b1 - b2) <= tolerance;
+        }
+
+        // 查找相似颜色
+        function findSimilarColor(r, g, b, tolerance) {
+            if (tolerance === 0) return null;
+            
+            for (const [colorKey, data] of colorMap) {
+                const [cr, cg, cb] = data.rgb;
+                if (colorsMatch(r, g, b, cr, cg, cb, tolerance)) {
+                    return colorKey;
+                }
+            }
+            return null;
+        }
+
+        // 分析颜色
+        async function analyzeColors() {
+            if (!imageData) return;
+
+            analyzeBtn.disabled = true;
+            progressContainer.classList.add('active');
+            progressTitle.textContent = '正在扫描像素...';
+            
+            colorMap.clear();
+            const tolerance = parseInt(toleranceSlider.value);
+            const data = imageData.data;
+            const totalPixels = data.length / 4;
+            const width = imageData.width;
+            const height = imageData.height;
+            
+            // 分块处理避免阻塞
+            const chunkSize = 5000;
+            let processed = 0;
+            
+            function processChunk() {
+                const end = Math.min(processed + chunkSize, totalPixels);
+                
+                for (let i = processed; i < end; i++) {
+                    const idx = i * 4;
+                    const r = data[idx];
+                    const g = data[idx + 1];
+                    const b = data[idx + 2];
+                    const a = data[idx + 3];
+                    
+                    // 跳过完全透明的像素
+                    if (a === 0) continue;
+                    
+                    let colorKey;
+                    
+                    if (tolerance > 0) {
+                        // 查找相似颜色
+                        const similar = findSimilarColor(r, g, b, tolerance);
+                        if (similar) {
+                            colorKey = similar;
+                            colorMap.get(colorKey).count++;
+                            colorMap.get(colorKey).positions.push(i);
+                            continue;
+                        }
+                    }
+                    
+                    colorKey = `${r},${g},${b}`;
+                    
+                    if (!colorMap.has(colorKey)) {
+                        colorMap.set(colorKey, {
+                            rgb: [r, g, b],
+                            hex: rgbToHex(r, g, b),
+                            count: 0,
+                            positions: [],
+                            r, g, b
+                        });
+                    }
+                    
+                    colorMap.get(colorKey).count++;
+                    colorMap.get(colorKey).positions.push(i);
+                }
+                
+                processed = end;
+                const progress = Math.round((processed / totalPixels) * 100);
+                progressText.textContent = `${progress}%`;
+                progressFill.style.width = `${progress}%`;
+                
+                if (processed < totalPixels) {
+                    requestAnimationFrame(processChunk);
+                } else {
+                    // 分析完成
+                    finishAnalysis(totalPixels, width, height);
+                }
+            }
+            
+            processChunk();
+        }
+
+        // 完成分析
+        function finishAnalysis(totalPixels, width, height) {
+            const startTime = performance.now();
+            
+            // 按像素数量排序颜色
+            const sortedColors = Array.from(colorMap.entries())
+                .sort((a, b) => b[1].count - a[1].count);
+            
+            progressTitle.textContent = '正在生成预览...';
+            progressText.textContent = '准备中...';
+            progressFill.style.width = '0%';
+            
+            // 生成每种颜色的独立图片
+            let processed = 0;
+            const total = sortedColors.length;
+            
+            function generateNext() {
+                if (processed >= total) {
+                    // 全部完成
+                    finishGeneration(startTime, totalPixels, total);
+                    return;
+                }
+                
+                const [colorKey, colorData] = sortedColors[processed];
+                createColorCanvas(colorData, width, height);
+                
+                processed++;
+                const progress = Math.round((processed / total) * 100);
+                progressText.textContent = `${progress}%`;
+                progressFill.style.width = `${progress}%`;
+                
+                requestAnimationFrame(generateNext);
+            }
+            
+            generateNext();
+        }
+
+        // 为特定颜色创建Canvas
+        function createColorCanvas(colorData, width, height) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            
+            // 创建图像数据
+            const newImageData = ctx.createImageData(width, height);
+            const data = newImageData.data;
+            
+            // 填充透明背景
+            data.fill(0);
+            
+            // 只填充该颜色的像素
+            const [r, g, b] = colorData.rgb;
+            for (const pos of colorData.positions) {
+                const idx = pos * 4;
+                data[idx] = r;
+                data[idx + 1] = g;
+                data[idx + 2] = b;
+                data[idx + 3] = 255; // 完全不透明
+            }
+            
+            ctx.putImageData(newImageData, 0, 0);
+            
+            // 存储引用
+            colorCanvases.set(colorData.hex, canvas);
+            
+            // 创建预览卡片
+            createPreviewCard(colorData, canvas);
+        }
+
+        // 创建预览卡片
+        function createPreviewCard(colorData, canvas) {
+            const card = document.createElement('div');
+            card.className = 'preview-card';
+            card.style.setProperty('--card-color', colorData.hex);
+            
+            const percentage = ((colorData.count / (imageData.width * imageData.height)) * 100).toFixed(2);
+            
+            card.innerHTML = `
+                <div class="preview-header">
+                    <div class="color-info">
+                        <div class="color-box" style="background: ${colorData.hex};"></div>
+                        <div class="color-details">
+                            <div class="color-hex">${colorData.hex.toUpperCase()}</div>
+                            <div class="color-count">${colorData.count.toLocaleString()} 像素 (${percentage}%)</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-canvas-wrapper">
+                    <canvas class="preview-canvas" id="canvas-${colorData.hex.replace('#', '')}"></canvas>
+                </div>
+                <button class="download-single" onclick="downloadSingle('${colorData.hex}')">
+                    💾 下载 ${colorData.hex.toUpperCase()}.png
+                </button>
+            `;
+            
+            previewGrid.appendChild(card);
+            
+            // 复制canvas内容到预览
+            const previewCanvas = card.querySelector('.preview-canvas');
+            previewCanvas.width = canvas.width;
+            previewCanvas.height = canvas.height;
+            const ctx = previewCanvas.getContext('2d');
+            ctx.drawImage(canvas, 0, 0);
+        }
+
+        // 完成生成
+        function finishGeneration(startTime, totalPixels, colorCount) {
+            const endTime = performance.now();
+            
+            progressContainer.classList.remove('active');
+            statsBar.classList.add('active');
+            previewSection.classList.add('active');
+            downloadAllBtn.disabled = false;
+            
+            document.getElementById('totalColors').textContent = colorCount;
+            document.getElementById('totalPixels').textContent = totalPixels.toLocaleString();
+            document.getElementById('processTime').textContent = Math.round(endTime - startTime) + 'ms';
+            
+            analyzeBtn.textContent = '✅ 分析完成';
+        }
+
+        // 下载单个颜色
+        window.downloadSingle = function(hex) {
+            const canvas = colorCanvases.get(hex);
+            if (!canvas) return;
+            
+            const link = document.createElement('a');
+            link.download = `color-${hex.replace('#', '').toUpperCase()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        };
+
+        // 打包下载全部
+        async function downloadAll() {
+            if (colorCanvases.size === 0) return;
+            
+            downloadAllBtn.disabled = true;
+            downloadAllBtn.textContent = '📦 打包中...';
+            
+            const zip = new JSZip();
+            const folder = zip.folder("color-layers");
+            
+            let processed = 0;
+            const total = colorCanvases.size;
+            
+            for (const [hex, canvas] of colorCanvases) {
+                const dataUrl = canvas.toDataURL('image/png');
+                const base64Data = dataUrl.split(',')[1];
+                folder.file(`color-${hex.replace('#', '').toUpperCase()}.png`, base64Data, { base64: true });
+                
+                processed++;
+                downloadAllBtn.textContent = `📦 打包中... ${Math.round((processed/total)*100)}%`;
+                
+                // 每10个文件让出线程
+                if (processed % 10 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
+            
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = "color-layers.zip";
+            link.click();
+            
+            downloadAllBtn.textContent = '✅ 下载完成';
+            setTimeout(() => {
+                downloadAllBtn.textContent = '📦 打包下载全部';
+                downloadAllBtn.disabled = false;
+            }, 2000);
+        }
+
+        // 重置
+        function reset() {
+            originalImage = null;
+            imageData = null;
+            colorMap.clear();
+            colorCanvases.clear();
+            
+            fileInput.value = '';
+            uploadSection.classList.remove('hidden');
+            originalPreview.classList.add('hidden');
+            toleranceControl.classList.add('hidden');
+            progressContainer.classList.remove('active');
+            statsBar.classList.remove('active');
+            previewSection.classList.remove('active');
+            previewGrid.innerHTML = '';
+            
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '🔍 分析颜色';
+            downloadAllBtn.disabled = true;
+            downloadAllBtn.textContent = '📦 打包下载全部';
+            
+            const ctx = originalCanvas.getContext('2d');
+            ctx.clearRect(0, 0, originalCanvas.width, originalCanvas.height);
+        }
+
+        // 事件绑定
+        analyzeBtn.addEventListener('click', analyzeColors);
+        downloadAllBtn.addEventListener('click', downloadAll);
+        resetBtn.addEventListener('click', reset);
+    </script>
+</body>
+</html>

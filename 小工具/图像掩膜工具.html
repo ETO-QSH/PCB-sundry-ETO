@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像掩膜工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eaeaea;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .upload-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .upload-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 25px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .upload-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.2);
+            border-color: rgba(0, 212, 255, 0.3);
+        }
+
+        .upload-card h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-size: 1.2rem;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-label {
+            display: block;
+            padding: 15px;
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: 2px dashed transparent;
+        }
+
+        .file-label:hover {
+            opacity: 0.9;
+            transform: scale(1.02);
+        }
+
+        .file-label.has-file {
+            background: #2ecc71;
+        }
+
+        .controls {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="color"] {
+            width: 80px;
+            height: 50px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: none;
+        }
+
+        input[type="range"] {
+            width: 200px;
+            accent-color: #00d4ff;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #7b2cbf);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #eaeaea;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .canvas-wrapper {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .canvas-wrapper h3 {
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-size: 1.1rem;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            background: #000;
+        }
+
+        .info {
+            text-align: center;
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .value-display {
+            color: #00d4ff;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .canvas-container {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 图像掩膜工具</h1>
+        
+        <div class="upload-section">
+            <div class="upload-card">
+                <h3>📄 上传模板图（黑白）</h3>
+                <div class="file-input-wrapper">
+                    <input type="file" id="maskInput" accept="image/*">
+                    <label for="maskInput" class="file-label" id="maskLabel">
+                        选择黑白模板图片
+                    </label>
+                </div>
+                <p class="info">黑色区域将被替换为指定颜色</p>
+            </div>
+            
+            <div class="upload-card">
+                <h3>🖼️ 上传原图</h3>
+                <div class="file-input-wrapper">
+                    <input type="file" id="sourceInput" accept="image/*">
+                    <label for="sourceInput" class="file-label" id="sourceLabel">
+                        选择原图
+                    </label>
+                </div>
+                <p class="info">将作为底图显示</p>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>填充颜色</label>
+                <input type="color" id="fillColor" value="#ff0000">
+            </div>
+            
+            <div class="control-group">
+                <label>颜色强度 <span id="intensityValue" class="value-display">100%</span></label>
+                <input type="range" id="intensity" min="0" max="100" value="100">
+            </div>
+            
+            <div class="control-group">
+                <label>阈值 <span id="thresholdValue" class="value-display">128</span></label>
+                <input type="range" id="threshold" min="0" max="255" value="128">
+            </div>
+            
+            <button class="btn btn-primary" onclick="processMask()">应用掩膜</button>
+            <button class="btn btn-secondary" onclick="downloadResult()">下载结果</button>
+        </div>
+
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <h3>模板预览</h3>
+                <canvas id="maskCanvas"></canvas>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <h3>原图预览</h3>
+                <canvas id="sourceCanvas"></canvas>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <h3>结果预览</h3>
+                <canvas id="resultCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const maskInput = document.getElementById('maskInput');
+        const sourceInput = document.getElementById('sourceInput');
+        const maskCanvas = document.getElementById('maskCanvas');
+        const sourceCanvas = document.getElementById('sourceCanvas');
+        const resultCanvas = document.getElementById('resultCanvas');
+        const fillColor = document.getElementById('fillColor');
+        const intensity = document.getElementById('intensity');
+        const threshold = document.getElementById('threshold');
+        
+        let maskImage = null;
+        let sourceImage = null;
+
+        // 更新滑块显示值
+        intensity.addEventListener('input', (e) => {
+            document.getElementById('intensityValue').textContent = e.target.value + '%';
+        });
+        
+        threshold.addEventListener('input', (e) => {
+            document.getElementById('thresholdValue').textContent = e.target.value;
+        });
+
+        // 处理文件上传
+        function handleFileUpload(file, canvas, isMask) {
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    if (isMask) {
+                        maskImage = img;
+                        document.getElementById('maskLabel').classList.add('has-file');
+                        document.getElementById('maskLabel').textContent = '✓ 已上传: ' + file.name;
+                    } else {
+                        sourceImage = img;
+                        document.getElementById('sourceLabel').classList.add('has-file');
+                        document.getElementById('sourceLabel').textContent = '✓ 已上传: ' + file.name;
+                    }
+                    
+                    // 如果两张图都上传了，自动处理
+                    if (maskImage && sourceImage) {
+                        processMask();
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        maskInput.addEventListener('change', (e) => {
+            handleFileUpload(e.target.files[0], maskCanvas, true);
+        });
+
+        sourceInput.addEventListener('change', (e) => {
+            handleFileUpload(e.target.files[0], sourceCanvas, false);
+        });
+
+        function processMask() {
+            if (!maskImage || !sourceImage) {
+                alert('请先上传模板图和原图！');
+                return;
+            }
+
+            // 确保尺寸一致，以原图为基准
+            const width = sourceImage.width;
+            const height = sourceImage.height;
+            
+            resultCanvas.width = width;
+            resultCanvas.height = height;
+            
+            const resultCtx = resultCanvas.getContext('2d');
+            const maskCtx = maskCanvas.getContext('2d');
+            const sourceCtx = sourceCanvas.getContext('2d');
+            
+            // 获取图像数据
+            const maskData = maskCtx.getImageData(0, 0, width, height);
+            const sourceData = sourceCtx.getImageData(0, 0, width, height);
+            const resultData = resultCtx.createImageData(width, height);
+            
+            // 解析颜色
+            const colorHex = fillColor.value;
+            const r = parseInt(colorHex.substr(1, 2), 16);
+            const g = parseInt(colorHex.substr(3, 2), 16);
+            const b = parseInt(colorHex.substr(5, 2), 16);
+            const alpha = intensity.value / 100;
+            const thresh = parseInt(threshold.value);
+            
+            // 处理每个像素
+            for (let i = 0; i < maskData.data.length; i += 4) {
+                const maskR = maskData.data[i];
+                const maskG = maskData.data[i + 1];
+                const maskB = maskData.data[i + 2];
+                
+                // 计算灰度值（亮度）
+                const brightness = (maskR + maskG + maskB) / 3;
+                
+                if (brightness < thresh) {
+                    // 模板黑色区域：使用指定颜色（混合模式）
+                    resultData.data[i] = r * alpha + sourceData.data[i] * (1 - alpha);
+                    resultData.data[i + 1] = g * alpha + sourceData.data[i + 1] * (1 - alpha);
+                    resultData.data[i + 2] = b * alpha + sourceData.data[i + 2] * (1 - alpha);
+                    resultData.data[i + 3] = 255; // 完全不透明
+                } else {
+                    // 模板白色区域：保留原图
+                    resultData.data[i] = sourceData.data[i];
+                    resultData.data[i + 1] = sourceData.data[i + 1];
+                    resultData.data[i + 2] = sourceData.data[i + 2];
+                    resultData.data[i + 3] = sourceData.data[i + 3];
+                }
+            }
+            
+            resultCtx.putImageData(resultData, 0, 0);
+        }
+
+        function downloadResult() {
+            if (!resultCanvas.width) {
+                alert('请先生成结果图！');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.download = 'masked_image.png';
+            link.href = resultCanvas.toDataURL();
+            link.click();
+        }
+
+        // 拖拽支持
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // 添加拖拽高亮效果
+        document.body.addEventListener('dragover', () => {
+            document.body.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%)';
+        });
+
+        document.body.addEventListener('dragleave', () => {
+            document.body.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)';
+        });
+
+        document.body.addEventListener('drop', handleDrop);
+
+        function handleDrop(e) {
+            document.body.style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)';
+            const files = e.dataTransfer.files;
+            
+            if (files.length >= 2) {
+                // 假设第一个是模板，第二个是原图
+                handleFileUpload(files[0], maskCanvas, true);
+                setTimeout(() => {
+                    handleFileUpload(files[1], sourceCanvas, false);
+                }, 100);
+            } else if (files.length === 1) {
+                // 智能判断：如果还没上传模板，就作为模板，否则作为原图
+                if (!maskImage) {
+                    handleFileUpload(files[0], maskCanvas, true);
+                } else {
+                    handleFileUpload(files[0], sourceCanvas, false);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
